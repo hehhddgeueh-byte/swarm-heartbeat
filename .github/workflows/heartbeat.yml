@@ -1,0 +1,24 @@
+name: swarm-heartbeat
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Worker health
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://torque-runtime.torque-runtime.workers.dev/health || echo "000")
+          echo "$(date -u +%FT%TZ) worker_health=$STATUS" >> heartbeat.log
+          cat heartbeat.log | tail -3
+      - name: Commit heartbeat
+        run: |
+          git config user.name "torque-swarm"
+          git config user.email "torque-swarm@users.noreply.github.com"
+          git add heartbeat.log
+          git diff --cached --quiet || git commit -m "heartbeat $(date -u +%FT%TZ)"
+          git push
